@@ -1,0 +1,49 @@
+version: '3.8'  
+
+services:
+  dind:
+    image: docker:dind  # Docker-in-Docker image
+    container_name: dind  
+    privileged: true  # Allow the container to run Docker commands inside Docker
+    environment:
+      - DOCKER_TLS_CERTDIR=/certs  
+    volumes:
+      - docker-certs-ca:/certs/ca  
+      - docker-certs-client:/certs/client  
+      - jenkins-data:/var/jenkins_home  
+    networks:
+      jenkins_net:
+        aliases:
+          - docker  
+    ports:
+      - "2376:2376"  # Expose Docker API on port 2376
+
+  jenkins:
+    image: jenkins/jenkins:lts-jdk11  
+    container_name: jenkins  # Name of the Jenkins container
+    user: root  
+    environment:
+      - DOCKER_HOST=tcp://docker:2376  
+      - DOCKER_CERT_PATH=/certs/client  
+      - DOCKER_TLS_VERIFY=1  
+    volumes:
+      - docker-certs-client:/certs/client:ro  
+      - jenkins-data:/var/jenkins_home  
+      - /usr/bin/docker:/usr/bin/docker  
+    networks:
+      jenkins_net:
+        aliases:
+          - jenkins  
+    ports:
+      - "8081:8080"  
+      - "50000:50000"  
+    restart: unless-stopped  # Restart policy to keep the container running
+
+networks:
+  jenkins_net:  # Define a network for communication between Jenkins and DinD
+    driver: bridge
+
+volumes:
+  docker-certs-ca:  # Persistent volume for Docker CA certificates
+  docker-certs-client:  # Persistent volume for Docker client certificates
+  jenkins-data:  # Persistent volume for Jenkins data
